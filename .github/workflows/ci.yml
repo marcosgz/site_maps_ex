@@ -27,7 +27,7 @@ jobs:
             otp: "28"
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Set up Elixir
         uses: erlef/setup-beam@v1
@@ -46,7 +46,7 @@ jobs:
           for i in $(seq 1 60); do curl -s -o /dev/null http://localhost:9000/ && break; sleep 1; done
 
       - name: Cache deps
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             deps
@@ -67,7 +67,7 @@ jobs:
       MIX_ENV: dev
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Set up Elixir
         uses: erlef/setup-beam@v1
@@ -76,7 +76,7 @@ jobs:
           otp-version: "28"
 
       - name: Cache deps and PLTs
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             deps
@@ -109,7 +109,7 @@ jobs:
         working-directory: examples/two_tenants
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Set up Elixir
         uses: erlef/setup-beam@v1
@@ -118,7 +118,7 @@ jobs:
           otp-version: "28"
 
       - name: Cache deps
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             examples/two_tenants/deps
@@ -142,7 +142,7 @@ jobs:
         working-directory: examples/single_site
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Set up Elixir
         uses: erlef/setup-beam@v1
@@ -151,7 +151,7 @@ jobs:
           otp-version: "28"
 
       - name: Cache deps
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             examples/single_site/deps
