@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Minimal test schema for <xhtml:link rel="alternate">; the official XHTML schema is not vendored. -->
+<xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+            targetNamespace="http://www.w3.org/1999/xhtml"
+            xmlns="http://www.w3.org/1999/xhtml"
+            elementFormDefault="qualified">
+  <xsd:element name="link">
+    <xsd:complexType>
+      <xsd:attribute name="rel" type="xsd:string" use="required"/>
+      <xsd:attribute name="hreflang" type="xsd:language"/>
+      <xsd:attribute name="href" type="xsd:anyURI" use="required"/>
+      <xsd:attribute name="media" type="xsd:string"/>
+    </xsd:complexType>
+  </xsd:element>
+</xsd:schema>

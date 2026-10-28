@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Minimal test schema for the retired <mobile:mobile/> tag; Google no longer publishes one. -->
+<xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+            targetNamespace="http://www.google.com/schemas/sitemap-mobile/1.0"
+            xmlns="http://www.google.com/schemas/sitemap-mobile/1.0"
+            elementFormDefault="qualified">
+  <xsd:element name="mobile">
+    <xsd:complexType/>
+  </xsd:element>
+</xsd:schema>
