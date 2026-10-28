@@ -15,14 +15,13 @@ defmodule TwoTenants.Sitemaps do
     ]
   end
 
-  process(:static)
+  process :static
 
-  process(:posts, "posts/%{year}-%{month}/sitemap.xml",
+  process :posts, "posts/%{year}-%{month}/sitemap.xml",
     args: [year: :integer, month: :integer],
     defaults: [year: &__MODULE__.this_year/0, month: &__MODULE__.this_month/0]
-  )
 
-  process(:news, "news/sitemap.xml")
+  process :news, "news/sitemap.xml"
 
   @impl SiteMaps
   def urls(:static, _args, _context),

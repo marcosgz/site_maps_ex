@@ -19,7 +19,7 @@ defmodule SiteMaps.MixProject do
       package: [
         licenses: ["MIT"],
         links: %{"GitHub" => @source_url},
-        files: ~w(lib priv/xsl mix.exs README.md CHANGELOG.md LICENSE.txt)
+        files: ~w(lib priv/xsl .formatter.exs mix.exs README.md CHANGELOG.md LICENSE.txt)
       ],
       docs: [main: "readme", extras: ["README.md", "CHANGELOG.md"], source_ref: "v#{@version}"]
     ]

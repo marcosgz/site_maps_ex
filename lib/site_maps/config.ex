@@ -1,6 +1,8 @@
 defmodule SiteMaps.Config do
   @moduledoc """
-  Validated configuration of a sitemap module, built from its `c:SiteMaps.config/1` callback.
+  Validated configuration of a sitemap module. Options are given to `use SiteMaps`, read from the
+  application environment when `:otp_app` is set, and returned by the optional
+  `c:SiteMaps.config/1` callback, in that order of precedence, later sources winning.
 
   ## Options
 

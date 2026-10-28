@@ -24,3 +24,11 @@ updates:
     groups:
       example-mix:
         update-types: [minor, patch]
+
+  - package-ecosystem: mix
+    directory: /examples/single_site
+    schedule:
+      interval: weekly
+    groups:
+      example-single-site-mix:
+        update-types: [minor, patch]

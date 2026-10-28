@@ -2,6 +2,7 @@
 
 A Phoenix app serving sitemaps for two tenants from one sitemap module, using
 [site_maps](../../README.md). It depends on the package through `{:site_maps, path: "../.."}`.
+For real host→site→theme apps, see [multitenancy_phoenix](https://github.com/marcosgz/multitenancy_phoenix).
 
 | Host                  | Tenant   |
 | --------------------- | -------- |

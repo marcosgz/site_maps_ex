@@ -133,3 +133,36 @@ jobs:
       - run: mix compile --warnings-as-errors
 
       - run: mix test
+
+  example_single_site:
+    name: Example app (single_site)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: examples/single_site
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up Elixir
+        uses: erlef/setup-beam@v1
+        with:
+          elixir-version: "1.19"
+          otp-version: "28"
+
+      - name: Cache deps
+        uses: actions/cache@v4
+        with:
+          path: |
+            examples/single_site/deps
+            examples/single_site/_build
+          key: example-single-site-${{ hashFiles('examples/single_site/mix.lock', 'mix.lock') }}
+          restore-keys: example-single-site-
+
+      - run: mix deps.get
+
+      - run: mix format --check-formatted
+
+      - run: mix compile --warnings-as-errors
+
+      - run: mix test

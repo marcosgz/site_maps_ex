@@ -1,14 +1,9 @@
 defmodule SiteMaps do
   @moduledoc """
-  Sitemap generation: streaming, parallel, incremental and multi-tenant.
+  Sitemap generation: streaming, parallel and incremental.
 
       defmodule MyApp.Sitemaps do
-        use SiteMaps
-
-        @impl SiteMaps
-        def config(%{site: site}) do
-          [url: "https://\#{site.host}/sitemap.xml.gz", adapter: {SiteMaps.Adapters.FileSystem, directory: "priv/sitemaps/\#{site.slug}"}]
-        end
+        use SiteMaps, otp_app: :my_app, adapter: {SiteMaps.Adapters.FileSystem, directory: "priv/sitemaps"}
 
         process :static
         process :posts, "posts/%{year}-%{month}/sitemap.xml",
@@ -18,17 +13,25 @@ defmodule SiteMaps do
         @impl SiteMaps
         def urls(:static, _args, _context), do: [url("/", priority: 1.0)]
 
-        def urls(:posts, %{year: year, month: month}, %{site: site}) do
-          site |> MyApp.Posts.stream(year, month) |> Stream.map(&url("/posts/\#{&1.slug}", lastmod: &1.updated_at))
+        def urls(:posts, %{year: year, month: month}, _context) do
+          MyApp.Posts.stream(year, month) |> Stream.map(&url("/posts/\#{&1.slug}", lastmod: &1.updated_at))
         end
       end
 
-      SiteMaps.generate(MyApp.Sitemaps, context: %{site: site})
-      SiteMaps.generate(MyApp.Sitemaps, context: %{site: site}, only: [posts: [year: 2026, month: 3]])
+      # config/runtime.exs
+      config :my_app, MyApp.Sitemaps, url: "https://example.com/sitemap.xml.gz"
+
+      SiteMaps.generate(MyApp.Sitemaps)
+      SiteMaps.generate(MyApp.Sitemaps, only: [posts: [year: 2026, month: 3]])
 
   Every process returns an `Enumerable` of `SiteMaps.URL` entries, consumed lazily and written to
   files that rotate at the sitemap protocol limits. Processes run in parallel, and runs that only
   regenerate some processes keep the other entries of the existing index.
+
+  For several sites in one app, pass a `:context` identifying the site to `generate/2` and
+  implement `c:config/1` to build each site's options from it. See
+  [multitenancy_phoenix](https://github.com/marcosgz/multitenancy_phoenix) for host→site→theme
+  Phoenix apps.
   """
 
   alias SiteMaps.{Config, Process}
@@ -48,13 +51,31 @@ defmodule SiteMaps do
   @doc "Builds the context from its serialized form (mix task and Oban arguments)."
   @callback load_context(map) :: map
 
-  @optional_callbacks external_sitemaps: 1, url_filter: 2, load_context: 1
+  @optional_callbacks config: 1, external_sitemaps: 1, url_filter: 2, load_context: 1
 
-  defmacro __using__(_opts) do
+  @doc """
+  Defines a sitemap module.
+
+  Configuration options (see `SiteMaps.Config`) can be given here, read from the application
+  environment with `:otp_app`, and returned by `c:config/1`. They are merged in that order, so
+  later sources win:
+
+      use SiteMaps, otp_app: :my_app, adapter: {SiteMaps.Adapters.FileSystem, directory: "priv/sitemaps"}
+
+      # config/runtime.exs
+      config :my_app, MyApp.Sitemaps, url: "https://example.com/sitemap.xml"
+
+  `c:config/1` is only needed when options depend on the context, e.g. one sitemap per site.
+  """
+  defmacro __using__(opts) do
+    {otp_app, config} = Keyword.pop(opts, :otp_app)
+
     quote do
       @behaviour SiteMaps
       import SiteMaps, only: [process: 1, process: 2, process: 3, url: 1, url: 2]
       Module.register_attribute(__MODULE__, :site_maps_processes, accumulate: true)
+      @site_maps_otp_app unquote(otp_app)
+      @site_maps_config unquote(config)
       @before_compile SiteMaps
     end
   end
@@ -84,34 +105,47 @@ defmodule SiteMaps do
   @doc false
   defmacro __before_compile__(env) do
     declared = env.module |> Module.get_attribute(:site_maps_processes) |> Enum.reverse()
-    names = Enum.map(declared, &elem(&1, 0))
-
-    if names == [] do
-      raise CompileError, file: env.file, description: "#{inspect(env.module)} declares no sitemap process"
-    end
-
-    case names -- Enum.uniq(names) do
-      [] -> :ok
-      [dup | _] -> raise CompileError, file: env.file, description: "sitemap process #{inspect(dup)} is declared twice"
-    end
-
+    validate_names!(env, Enum.map(declared, &elem(&1, 0)))
     validate_locations!(env, declared)
+    processes = Enum.map(declared, &process_ast/1)
 
-    processes =
-      for {name, location, opts} <- declared do
-        quote do
-          %SiteMaps.Process{
-            name: unquote(name),
-            location: unquote(location),
-            args: unquote(opts[:args] || []),
-            defaults: unquote(opts[:defaults] || [])
-          }
-        end
-      end
+    config = env.module |> Module.get_attribute(:site_maps_config) |> Macro.escape()
 
     quote do
       @doc false
       def __site_maps__(:processes), do: unquote(processes)
+
+      def __site_maps__(:otp_app), do: @site_maps_otp_app
+
+      def __site_maps__(:config) do
+        base = unquote(config)
+
+        if @site_maps_otp_app,
+          do: Keyword.merge(base, Application.get_env(@site_maps_otp_app, __MODULE__, [])),
+          else: base
+      end
+    end
+  end
+
+  defp validate_names!(env, []) do
+    raise CompileError, file: env.file, description: "#{inspect(env.module)} declares no sitemap process"
+  end
+
+  defp validate_names!(env, names) do
+    case names -- Enum.uniq(names) do
+      [] -> :ok
+      [dup | _] -> raise CompileError, file: env.file, description: "sitemap process #{inspect(dup)} is declared twice"
+    end
+  end
+
+  defp process_ast({name, location, opts}) do
+    quote do
+      %SiteMaps.Process{
+        name: unquote(name),
+        location: unquote(location),
+        args: unquote(opts[:args] || []),
+        defaults: unquote(opts[:defaults] || [])
+      }
     end
   end
 
@@ -150,9 +184,25 @@ defmodule SiteMaps do
   @spec processes(module) :: [Process.t()]
   def processes(module), do: module.__site_maps__(:processes)
 
-  @doc "Builds the validated configuration of `module` for `context`."
+  @doc """
+  Builds the validated configuration of `module` for `context`: the `use SiteMaps` options, then
+  the application environment (`:otp_app`), then `c:config/1` when the module defines it.
+  """
   @spec config!(module, map) :: Config.t()
-  def config!(module, context), do: context |> module.config() |> Config.new!()
+  def config!(module, context) do
+    opts =
+      module.__site_maps__(:config)
+      |> Keyword.merge(if function_exported?(module, :config, 1), do: module.config(context), else: [])
+
+    for key <- [:url, :adapter], not Keyword.has_key?(opts, key) do
+      raise ArgumentError,
+            "#{inspect(module)} has no #{inspect(key)} option: give it to `use SiteMaps`, set it with " <>
+              "`config #{inspect(module.__site_maps__(:otp_app) || :my_app)}, #{inspect(module)}, #{key}: ...` " <>
+              "(requires `use SiteMaps, otp_app: ...`) or return it from config/1"
+    end
+
+    Config.new!(opts)
+  end
 
   @doc """
   Generates the sitemaps of `module`.
