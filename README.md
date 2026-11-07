@@ -1,4 +1,9 @@
-# SiteMaps
+<h1 align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/marcosgz/site_maps_ex/master/docs/brand/lockup-sitemaps-on-dark.svg">
+    <img alt="SiteMaps" src="https://raw.githubusercontent.com/marcosgz/site_maps_ex/master/docs/brand/lockup-sitemaps-on-light.svg" width="310">
+  </picture>
+</h1>
 
 Sitemap generation for Elixir: streaming, parallel and incremental. It is the Elixir port of the
 [site_maps](https://github.com/marcosgz/site_maps) Ruby gem.
