@@ -4,6 +4,7 @@ defmodule SiteMaps.Telemetry do
 
     * `[:site_maps, :run, :start | :stop | :exception]` - metadata `%{module, context, only}`
     * `[:site_maps, :process, :start | :stop | :exception]` - metadata `%{module, process, args}`
+    * `[:site_maps, :rebuild_index, :start | :stop | :exception]` - metadata `%{module, context}`
     * `[:site_maps, :urlset, :write]` - measurements `%{links, news, bytes}`,
       metadata `%{module, process, key, url}`
     * `[:site_maps, :index, :write]` - measurements `%{entries, bytes}`, metadata `%{module, key, url}`

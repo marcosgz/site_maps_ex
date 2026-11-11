@@ -191,6 +191,94 @@ defmodule SiteMaps.RunnerTest do
     end
   end
 
+  describe "index_from_storage" do
+    setup %{store: store} do
+      boom = fn
+        2026, 2 -> Stream.map([1], fn _ -> raise "boom" end)
+        _, month -> urls(1, "/m#{month}")
+      end
+
+      %{ctx: %{store: store, config: [index_from_storage: true], posts: boom}}
+    end
+
+    defp store!(store, key), do: :ok = Memory.write([pid: store], key, "<urlset/>", %{})
+
+    test "lists stored files of declared processes missing from the index", %{store: store, ctx: ctx} do
+      store!(store, "posts/2025-12/sitemap1.xml")
+      store!(store, "legacy/sitemap1.xml")
+
+      assert {:ok, _} = SiteMaps.generate(Blog, context: ctx, only: [:static])
+
+      assert locs(read(store, "sitemap.xml")) == [
+               "https://blog.test/posts/2025-12/sitemap1.xml",
+               "https://blog.test/sitemap_static1.xml"
+             ]
+    end
+
+    test "keeps the lastmod of entries already in the index", %{store: store, ctx: ctx} do
+      dated = %{ctx | posts: fn _, _ -> [SiteMaps.url("/jan", lastmod: ~D[2026-01-15])] end}
+
+      assert {:ok, _} = SiteMaps.generate(Blog, context: dated, only: [posts: [year: 2026, month: 1]])
+      assert {:ok, _} = SiteMaps.generate(Blog, context: ctx, only: [:static])
+
+      assert read(store, "sitemap.xml") =~
+               "<loc>https://blog.test/posts/2026-1/sitemap1.xml</loc><lastmod>2026-01-15</lastmod>"
+    end
+
+    test "writes the index and runs every process when one fails", %{store: store, ctx: ctx} do
+      store!(store, "posts/2026-2/sitemap1.xml")
+
+      assert {:error, {:process_failed, :posts, %{year: 2026, month: 2}, :error, %RuntimeError{}, _}} =
+               SiteMaps.generate(Blog,
+                 context: ctx,
+                 only: [posts: [year: 2026, month: 2], posts: [year: 2026, month: 1], static: []],
+                 max_concurrency: 1
+               )
+
+      assert locs(read(store, "sitemap.xml")) == [
+               "https://blog.test/posts/2026-1/sitemap1.xml",
+               "https://blog.test/posts/2026-2/sitemap1.xml",
+               "https://blog.test/sitemap_static1.xml"
+             ]
+    end
+
+    test "never prunes the files of a failed process", %{store: store, ctx: ctx} do
+      store!(store, "posts/2026-2/sitemap1.xml")
+      store!(store, "posts/2026-1/sitemap2.xml")
+
+      assert {:error, _} =
+               SiteMaps.generate(Blog,
+                 context: ctx,
+                 only: [posts: [year: 2026, month: 2], posts: [year: 2026, month: 1]],
+                 prune: true
+               )
+
+      assert "posts/2026-2/sitemap1.xml" in keys(store)
+      refute "posts/2026-1/sitemap2.xml" in keys(store)
+    end
+
+    test "rebuild_index/2 writes the index from storage without running processes", %{store: store} do
+      store!(store, "sitemap_static1.xml")
+      store!(store, "posts/2026-1/sitemap1.xml")
+      store!(store, "posts/2026-1/sitemap2.xml")
+      ctx = %{store: store, static: fn -> flunk("process ran") end}
+
+      assert {:ok, %{index: "https://blog.test/sitemap.xml", files: files}} = SiteMaps.rebuild_index(Blog, context: ctx)
+      assert length(files) == 3
+
+      assert locs(read(store, "sitemap.xml")) == [
+               "https://blog.test/posts/2026-1/sitemap1.xml",
+               "https://blog.test/posts/2026-1/sitemap2.xml",
+               "https://blog.test/sitemap_static1.xml"
+             ]
+    end
+
+    test "rebuild_index/2 writes nothing when storage is empty", %{store: store} do
+      assert {:ok, %{index: nil, files: []}} = SiteMaps.rebuild_index(Blog, context: %{store: store})
+      assert keys(store) == []
+    end
+  end
+
   describe "errors" do
     test "a failing process stops the run without touching the index", %{store: store} do
       boom = fn _, _ -> Stream.map([1], fn _ -> raise "boom" end) end

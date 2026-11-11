@@ -14,6 +14,22 @@ defmodule SiteMaps.Runner do
     end)
   end
 
+  @spec rebuild_index(module, keyword) :: {:ok, Result.t()} | {:error, term}
+  def rebuild_index(module, opts \\ []) do
+    context = Keyword.get(opts, :context, %{})
+    config = %{SiteMaps.config!(module, context) | index_from_storage?: true}
+    run = %{module: module, context: context, config: config}
+
+    :telemetry.span([:site_maps, :rebuild_index], %{module: module, context: context}, fn ->
+      result =
+        with {:ok, published} <- Index.publish(run, [], [], externals(module, context), false) do
+          {:ok, %Result{index: if(published.written?, do: config.url), files: published.entries}}
+        end
+
+      {result, %{module: module, context: context, result: result}}
+    end)
+  end
+
   defp do_run(module, context, opts) do
     config = SiteMaps.config!(module, context)
 
@@ -35,8 +51,17 @@ defmodule SiteMaps.Runner do
     try do
       File.mkdir_p!(tmp_dir)
 
-      with {:ok, outcomes} <- run_all(run, executions) do
-        finish(run, outcomes, externals, Keyword.get(opts, :prune, false))
+      prune? = Keyword.get(opts, :prune, false)
+
+      case run_all(run, executions) do
+        {:ok, outcomes} ->
+          finish(run, outcomes, externals, prune?)
+
+        {:partial, outcomes, [error | _]} ->
+          with {:ok, _result} <- finish(run, outcomes, externals, prune?), do: error
+
+        {:error, _} = error ->
+          error
       end
     after
       :ets.delete(counters)
@@ -114,19 +139,43 @@ defmodule SiteMaps.Runner do
     :ok
   end
 
+  # By default the first failure stops the run. With `index_from_storage` every execution runs, and
+  # the successful ones are published even when others failed.
   defp run_all(run, executions) do
-    SiteMaps.TaskSupervisor
-    |> Task.Supervisor.async_stream_nolink(executions, &execute(run, &1),
-      max_concurrency: run.config.max_concurrency,
-      ordered: false,
-      timeout: :infinity
-    )
-    |> Enum.reduce_while({:ok, []}, fn
-      {:ok, {:ok, outcome}}, {:ok, acc} -> {:cont, {:ok, [outcome | acc]}}
-      {:ok, {:error, _} = error}, _acc -> {:halt, error}
-      {:exit, reason}, _acc -> {:halt, {:error, {:process_exit, reason}}}
+    results =
+      Task.Supervisor.async_stream_nolink(SiteMaps.TaskSupervisor, executions, &execute(run, &1),
+        max_concurrency: run.config.max_concurrency,
+        ordered: false,
+        timeout: :infinity
+      )
+
+    if run.config.index_from_storage?, do: collect_all(results), else: collect_until_error(results)
+  end
+
+  defp collect_until_error(results) do
+    Enum.reduce_while(results, {:ok, []}, fn result, {:ok, acc} ->
+      case outcome(result) do
+        {:ok, outcome} -> {:cont, {:ok, [outcome | acc]}}
+        error -> {:halt, error}
+      end
     end)
   end
+
+  defp collect_all(results) do
+    {outcomes, errors} =
+      Enum.reduce(results, {[], []}, fn result, {outcomes, errors} ->
+        case outcome(result) do
+          {:ok, outcome} -> {[outcome | outcomes], errors}
+          error -> {outcomes, [error | errors]}
+        end
+      end)
+
+    if errors == [], do: {:ok, outcomes}, else: {:partial, outcomes, Enum.reverse(errors)}
+  end
+
+  defp outcome({:ok, {:ok, _outcome} = ok}), do: ok
+  defp outcome({:ok, {:error, _} = error}), do: error
+  defp outcome({:exit, reason}), do: {:error, {:process_exit, reason}}
 
   defp execute(run, {process, args}) do
     meta = %{module: run.module, process: process.name, args: args}

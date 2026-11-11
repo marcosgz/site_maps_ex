@@ -218,6 +218,18 @@ defmodule SiteMaps do
   @spec generate(module, keyword) :: {:ok, SiteMaps.Result.t()} | {:error, term}
   defdelegate generate(module, opts \\ []), to: SiteMaps.Runner, as: :run
 
+  @doc """
+  Rewrites the index of `module` from the files found in storage, without running any process or
+  querying any data source. Every stored file matching a declared process location is listed,
+  plus the external sitemaps. Use it to restore a lost or stale index.
+
+  ## Options
+
+    * `:context` - map passed to the callbacks (default `%{}`)
+  """
+  @spec rebuild_index(module, keyword) :: {:ok, SiteMaps.Result.t()} | {:error, term}
+  defdelegate rebuild_index(module, opts \\ []), to: SiteMaps.Runner
+
   @doc "Same as `generate/2` but raises on errors."
   @spec generate!(module, keyword) :: SiteMaps.Result.t()
   def generate!(module, opts \\ []) do
