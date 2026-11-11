@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.0
+
+- `index_from_storage` option: the stored files of every declared process are listed in the index, so files missing from it (e.g. after a failed run) are listed again. A failing process no longer stops the run: the other processes keep running, the successful ones are published, and the first error is returned. Files of failed processes are never pruned.
+- `SiteMaps.rebuild_index/2` rewrites the index from storage without running any process.
+- `[:site_maps, :rebuild_index, :start | :stop | :exception]` telemetry events.
+
 ## 0.1.0
 
 First release. An Elixir port of the [site_maps](https://github.com/marcosgz/site_maps) Ruby gem:

@@ -21,7 +21,7 @@ Sitemap generation for Elixir: streaming, parallel and incremental. It is the El
 ```elixir
 def deps do
   [
-    {:site_maps, "~> 0.1"},
+    {:site_maps, "~> 0.2"},
     # only for the S3 and R2 adapters
     {:ex_aws, "~> 2.5"},
     {:ex_aws_s3, "~> 2.5"},
@@ -160,7 +160,8 @@ SiteMaps.generate(MyApp.Sitemaps,
   - A dynamic process must interpolate every argument in its location, so each shard gets its own files.
   - Two processes can't share a location.
   - Locations and interpolated values may only use `A-Z a-z 0-9 . _ ~ -`, and a value can't contain `/`.
-- **The index:** written last, and only when every process succeeded.
+- **The index:** written last, and only when every process succeeded. With `index_from_storage: true` the other processes keep running after a failure, the index is still written from the successful ones, and the first error is returned.
+- **Index from storage:** with `index_from_storage: true` every stored file matching a declared process location is listed in the index, even when the current index lost it. `SiteMaps.rebuild_index(MyApp.Sitemaps, context: ctx)` rewrites the index from storage alone, without running any process.
 - **Partial runs:** the existing index is read through the adapter. Only the entries of the regenerated shards are replaced. Entries of the other shards of declared processes are kept, while entries of removed processes and former external sitemaps are dropped.
 - **Pruning:** `prune: true` deletes files of the regenerated shards that the new index no longer lists.
 - **Inline mode:** a module with exactly one process, which is static and has no location, and no `external_sitemaps/1`, writes its URLs straight to the configured URL with no index, as long as they fit in one file. Otherwise it writes numbered files and an index.
@@ -254,7 +255,7 @@ MyApp.Sitemaps
 ## Telemetry
 
 The package emits these events:
-- `[:site_maps, :run | :process, :start | :stop | :exception]`
+- `[:site_maps, :run | :process | :rebuild_index, :start | :stop | :exception]`
 - `[:site_maps, :urlset, :write]`
 - `[:site_maps, :index, :write]`
 - `[:site_maps, :url, :foreign_host]`

@@ -8,14 +8,18 @@ defmodule SiteMaps.Index do
   `prune?`, deletes family files that are no longer listed.
 
   Existing entries are kept when they belong to a declared process and were not regenerated;
-  entries of removed processes and of former external sitemaps are dropped.
+  entries of removed processes and of former external sitemaps are dropped. With
+  `index_from_storage`, the stored files of declared processes count as existing entries too, so
+  files missing from the index (e.g. after a failed run) are listed again.
   """
   @spec publish(map, [Location.t()], [IndexEntry.t()], [IndexEntry.t()], boolean) ::
           {:ok, %{entries: [IndexEntry.t()], pruned: [String.t()], written?: boolean}} | {:error, term}
   def publish(%{config: %Config{} = config, module: module}, families, new_entries, externals, prune?) do
     patterns = Enum.map(SiteMaps.processes(module), &Location.pattern(config, &1))
 
-    with {:ok, existing} <- read(config),
+    with {:ok, indexed} <- read(config),
+         {:ok, stored} <- stored(config, patterns),
+         existing = indexed ++ stored,
          entries = merge(config, patterns, existing, families, new_entries, externals),
          :ok <- check_size(config, entries),
          {:ok, written?} <- write(config, module, entries),
@@ -31,6 +35,24 @@ defmodule SiteMaps.Index do
       {:ok, data, _meta} -> data |> gunzip() |> parse()
       {:error, :not_found} -> {:ok, []}
       {:error, reason} -> {:error, {:index_read_failed, reason}}
+    end
+  end
+
+  defp stored(%Config{index_from_storage?: false}, _patterns), do: {:ok, []}
+
+  defp stored(%Config{adapter: adapter, index_key: index_key} = config, patterns) do
+    case Adapter.list(adapter, "") do
+      {:ok, keys} ->
+        entries =
+          for key <- keys,
+              key != index_key,
+              Enum.any?(patterns, &Regex.match?(&1, key)),
+              do: %IndexEntry{loc: Config.key_to_url(config, key)}
+
+        {:ok, entries}
+
+      {:error, reason} ->
+        {:error, {:index_list_failed, reason}}
     end
   end
 

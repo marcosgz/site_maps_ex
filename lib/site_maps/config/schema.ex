@@ -36,6 +36,13 @@ defmodule SiteMaps.Config.Schema do
         default: "public, max-age=3600",
         doc: "Cache-Control stored with files."
       ],
+      index_from_storage: [
+        type: :boolean,
+        default: false,
+        doc:
+          "Also list the stored files of every declared process in the index, and still write the " <>
+            "index when a process fails (the other processes keep running)."
+      ],
       max_concurrency: [
         type: {:or, [:pos_integer, nil]},
         default: nil,
