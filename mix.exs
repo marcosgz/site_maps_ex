@@ -17,7 +17,7 @@ defmodule SiteMaps.MixProject do
       test_coverage: [summary: [threshold: 90]],
       dialyzer: [plt_add_apps: [:mix, :ex_aws, :ex_aws_s3, :oban], plt_local_path: "priv/plts"],
       package: [
-        licenses: ["MIT"],
+        licenses: ["GPL-3.0-or-later"],
         links: %{"GitHub" => @source_url},
         files: ~w(lib priv/xsl .formatter.exs mix.exs README.md CHANGELOG.md LICENSE.txt)
       ],
