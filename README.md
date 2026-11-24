@@ -349,4 +349,4 @@ What changed from the gem:
 
 ## License
 
-MIT
+GPL-3.0-or-later.

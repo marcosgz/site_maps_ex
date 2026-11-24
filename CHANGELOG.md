@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Relicensed from MIT to GPL-3.0-or-later.
+
 ## 0.2.0
 
 - `index_from_storage` option: the stored files of every declared process are listed in the index, so files missing from it (e.g. after a failed run) are listed again. A failing process no longer stops the run: the other processes keep running, the successful ones are published, and the first error is returned. Files of failed processes are never pruned.
